@@ -1,0 +1,10 @@
+{
+  "name": "pedidos-dfr-icono-dinamico",
+  "description": "Función segura para actualizar los iconos de la PWA Pedidos DFR desde el panel de administrador",
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  }
+}

@@ -70,7 +70,7 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 4px}
 @media (max-height:560px){#dfr-splash{gap:16px}#dfr-splash img{width:min(35vh,160px);height:min(35vh,160px)}#dfr-splash .dfr-splash-title{font-size:clamp(30px,7vw,44px)}}
 </style></head><body>
 <div id="dfr-splash" aria-label="Pedidos DFR" role="status">
-  <img src="icon-192.png" alt="Logo DFR" onerror="this.style.display='none'">
+  <img src="splash-logo.png" alt="Logo DFR" onerror="this.style.display='none'">
   <div class="dfr-splash-title">Pedidos DFR</div>
 </div>
 <script>
@@ -96,8 +96,9 @@ import {initializeApp} from "https://www.gstatic.com/firebasejs/12.19.0/firebase
 import {getFirestore,collection,query,where,onSnapshot,addDoc,setDoc,getDoc,doc,deleteDoc,updateDoc,arrayUnion,serverTimestamp} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
 import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {getMessaging,getToken} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js";
+import {getFunctions,httpsCallable} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-functions.js";
 const cfg={apiKey:"AIzaSyDo36T74A2kSIcTV5k1zRvalHKjvAB2kOg",authDomain:"pedidos-dfr.firebaseapp.com",projectId:"pedidos-dfr",storageBucket:"pedidos-dfr.firebasestorage.app",messagingSenderId:"611337061893",appId:"1:611337061893:web:83720a03b60e6a48e0fe6c"};const app=initializeApp(cfg);
-const db=getFirestore(app),auth=getAuth(app),secAuth=getAuth(initializeApp(cfg,'sec'));
+const db=getFirestore(app),auth=getAuth(app),secAuth=getAuth(initializeApp(cfg,'sec')),functions=getFunctions(app,'us-central1');
 const pwf=(id,ac)=>`<div class="pw"><input class="f" id="${id}" type="password" autocomplete="${ac}"><button type="button" class="eye" data-eye="${id}" aria-label="Mostrar contraseña">👁</button></div>`;
 addEventListener('click',e=>{const b=e.target.closest('[data-eye]');if(b){const i=document.getElementById(b.dataset.eye);i.type=i.type=='password'?'text':'password';b.textContent=i.type=='password'?'👁':'🙈'}});
 const DOM='@clientes.pedidos-dfr.app',isCust=u=>!!(u&&u.email&&u.email.endsWith(DOM));
@@ -258,7 +259,7 @@ function login(){
  $('#go').onclick=async()=>{try{await signInWithEmailAndPassword(auth,$('#em').value.trim(),$('#pw').value)}catch(e){$('#er').textContent='Correo o contraseña incorrectos.'}};
 }
 function shell(){
- $('#app').innerHTML=`<div class="atop"><b>Administrador</b><span><a class="lnk" href="#" style="text-decoration:none;padding:14px 6px">Ver tienda</a>${canAsk()?'<button class="lnk" id="av" style="padding:14px 6px">🔔 Avisos</button>':''}<button class="lnk" id="lo">Salir</button></span></div><div class="tabs">${[['p','Productos'],['c','Clientes'],['o','Pedidos']].map(([k,l])=>`<button data-t="${k}" class="${k==tab?'on':''}">${l}</button>`).join('')}</div><div id="frm"></div><div id="lst"></div>`;
+ $('#app').innerHTML=`<div class="atop"><b>Administrador</b><span><a class="lnk" href="#" style="text-decoration:none;padding:14px 6px">Ver tienda</a>${canAsk()?'<button class="lnk" id="av" style="padding:14px 6px">🔔 Avisos</button>':''}<button class="lnk" id="lo">Salir</button></span></div><div class="tabs">${[['p','Productos'],['c','Clientes'],['o','Pedidos'],['i','Ícono']].map(([k,l])=>`<button data-t="${k}" class="${k==tab?'on':''}">${l}</button>`).join('')}</div><div id="frm"></div><div id="lst"></div>`;
  $('#lo').onclick=()=>signOut(auth);
  if($('#av'))$('#av').onclick=async()=>{if(await activarAvisos('admin'))$('#av').remove()};
  document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.t;edit=null;shell()});
@@ -278,6 +279,12 @@ function frm(){
     await setDoc(edit?doc(db,'products',edit):doc(collection(db,'products')),d,{merge:true});edit=null;frm();toast('Producto guardado')}
    catch(e){$('#sv').disabled=false;$('#er').textContent='No se pudo guardar.'}
   };
+ }else if(tab=='i'){
+  f.innerHTML=`<div class="box"><b>Ícono de la aplicación</b><p class="sm">Elegí una imagen cuadrada. Se actualizará el ícono publicado en GitHub Pages; el logo dentro de la tienda no se modifica. El cambio del ícono del acceso instalado puede tardar en reflejarse según Android/Chrome.</p><label>Vista previa</label><div style="display:flex;justify-content:center;padding:12px"><img id="iconPreview" src="icon-192.png" alt="Ícono actual" style="width:120px;height:120px;object-fit:contain;border-radius:24px;background:#fff"></div><label>Elegir imagen</label><input class="f" id="iconFile" type="file" accept="image/png,image/jpeg,image/webp"><div class="err" id="iconErr"></div><button class="btn" id="iconSave">Publicar este ícono</button><button class="btn r" id="iconReset">Restaurar ícono original</button><p class="sm">Se conservan los nombres de archivos del manifiesto y no se toca el logo dentro de la pantalla de bienvenida.</p></div>`;
+  const file=$('#iconFile'),preview=$('#iconPreview'),err=$('#iconErr'),save=$('#iconSave');
+  file.onchange=()=>{const fl=file.files[0];if(!fl)return;const url=URL.createObjectURL(fl);preview.src=url;err.textContent='';};
+  async function publish(reset){save.disabled=true;$('#iconReset').disabled=true;err.textContent=reset?'Restaurando…':'Preparando imagen…';try{let image='';if(!reset){const fl=file.files[0];if(!fl)throw new Error('Elegí una imagen primero.');image=await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>{try{const make=n=>{const c=document.createElement('canvas');c.width=c.height=n;const x=c.getContext('2d');x.fillStyle='#ffffff';x.fillRect(0,0,n,n);const scale=Math.min(n/im.width,n/im.height);const w=im.width*scale,h=im.height*scale;x.drawImage(im,(n-w)/2,(n-h)/2,w,h);return c.toDataURL('image/png').split(',')[1]};resolve({icon192:make(192),icon512:make(512),maskable512:make(512)});}catch(e){reject(e)}};im.onerror=()=>reject(new Error('No se pudo leer esa imagen.'));im.src=URL.createObjectURL(fl)});}const call=httpsCallable(functions,'actualizarIconoDFR');const result=await call({reset,images:image});err.textContent=result.data?.message||'Solicitud completada. GitHub Pages puede tardar unos minutos en publicar el cambio.';toast('Solicitud enviada');}catch(e){console.error(e);err.textContent=e.message||'No se pudo actualizar. Revisá la configuración de la función y los permisos.';}finally{save.disabled=false;$('#iconReset').disabled=false;}}
+  save.onclick=()=>{if(confirm('¿Publicar esta imagen como ícono de Pedidos DFR?'))publish(false)};$('#iconReset').onclick=()=>{if(confirm('¿Restaurar el ícono original de Pedidos DFR?'))publish(true)};
  }else if(tab=='c'){
   const c=C.find(x=>x.id==edit)||{};
   f.innerHTML=`<div class="box"><b>${edit?'Editar cliente':'Nuevo cliente'}</b><label>Número de cliente</label><input class="f" id="cn" autocomplete="off" value="${esc(c.id)}" ${edit?'disabled':''}><label>Nombre</label><input class="f" id="cm" autocomplete="off" value="${esc(c.nombre)}"><label>Dirección de entrega</label><input class="f" id="cd" autocomplete="off" value="${esc(c.dir)}"><label>Contraseña del cliente (mín. 6; dejala vacía si ya tiene usuario)</label>${pwf('cp','new-password')}<div class="err" id="er"></div><button class="btn" id="sv">Guardar</button>${edit?'<button class="lnk" id="cx">Cancelar</button>':''}</div>`;
