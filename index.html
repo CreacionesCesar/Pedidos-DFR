@@ -95,11 +95,12 @@ label{display:block;font-size:13px;color:var(--mut);margin:12px 0 4px}
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
 import {getFirestore,collection,query,where,onSnapshot,addDoc,setDoc,getDoc,doc,deleteDoc,updateDoc,arrayUnion,serverTimestamp} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import {getAuth,signInWithEmailAndPassword,createUserWithEmailAndPassword,signOut,onAuthStateChanged,setPersistence,browserLocalPersistence} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
 import {getMessaging,getToken} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging.js";
 import {getFunctions,httpsCallable} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-functions.js";
 const cfg={apiKey:"AIzaSyDo36T74A2kSIcTV5k1zRvalHKjvAB2kOg",authDomain:"pedidos-dfr.firebaseapp.com",projectId:"pedidos-dfr",storageBucket:"pedidos-dfr.firebasestorage.app",messagingSenderId:"611337061893",appId:"1:611337061893:web:83720a03b60e6a48e0fe6c"};const app=initializeApp(cfg);
 const db=getFirestore(app),auth=getAuth(app),secAuth=getAuth(initializeApp(cfg,'sec')),functions=getFunctions(app,'us-central1');
+const authReady=setPersistence(auth,browserLocalPersistence).catch(e=>{console.error('Error al configurar la sesión persistente',e);});
 const pwf=(id,ac)=>`<div class="pw"><input class="f" id="${id}" type="password" autocomplete="${ac}"><button type="button" class="eye" data-eye="${id}" aria-label="Mostrar contraseña">👁</button></div>`;
 addEventListener('click',e=>{const b=e.target.closest('[data-eye]');if(b){const i=document.getElementById(b.dataset.eye);i.type=i.type=='password'?'text':'password';b.textContent=i.type=='password'?'👁':'🙈'}});
 const DOM='@clientes.pedidos-dfr.app',isCust=u=>!!(u&&u.email&&u.email.endsWith(DOM));
@@ -202,7 +203,7 @@ function loginCli(){
  $('#app').innerHTML=`<div class="box" style="margin-top:40px"><div style="font-size:18px;font-weight:600">Ingresá a tu cuenta</div><label>Número de cliente</label><input class="f" id="un" inputmode="numeric" autocomplete="username"><label>Contraseña</label>${pwf('up2','current-password')}<div class="err" id="er"></div><button class="btn" id="go">Ingresar</button></div>`;
  $('#er').textContent=msg;msg='';
  $('#go').onclick=async()=>{const n=$('#un').value.trim().toLowerCase(),p=$('#up2').value;if(!n||!p){$('#er').textContent='Completá número y contraseña.';return}
-  try{await signInWithEmailAndPassword(auth,n+DOM,p)}catch(e){console.error(e);const c=e&&e.code||'';$('#er').textContent=['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-email'].includes(c)?'Número o contraseña incorrectos.':c=='auth/too-many-requests'?'Demasiados intentos. Esperá unos minutos y probá de nuevo.':c=='auth/network-request-failed'?'Sin conexión con Firebase. Revisá tu internet.':'No se pudo ingresar ('+(c||'error')+').'}};
+  try{await authReady;await signInWithEmailAndPassword(auth,n+DOM,p)}catch(e){console.error(e);const c=e&&e.code||'';$('#er').textContent=['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-email'].includes(c)?'Número o contraseña incorrectos.':c=='auth/too-many-requests'?'Demasiados intentos. Esperá unos minutos y probá de nuevo.':c=='auth/network-request-failed'?'Sin conexión con Firebase. Revisá tu internet.':'No se pudo ingresar ('+(c||'error')+').'}};
 }
 async function descargar(id){
  toast('Preparando descarga…');
@@ -248,7 +249,7 @@ const rs=(f,m=600,ql=.7)=>new Promise(r=>{const i=new Image();i.onload=()=>{cons
 const nomCli=n=>(C.find(c=>c.id==n)||{}).nombre;
 function login(){
  $('#app').innerHTML=`<div class="box" style="margin-top:40px"><div style="font-size:18px;font-weight:600">Administrador</div><label>Correo</label><input class="f" id="em" type="email"><label>Contraseña</label>${pwf('pw','current-password')}<div class="err" id="er"></div><button class="btn" id="go">Ingresar</button><div style="text-align:center;margin-top:8px"><a class="lnk" href="#" style="text-decoration:none">← Volver a la tienda</a></div></div>`;
- $('#go').onclick=async()=>{try{await signInWithEmailAndPassword(auth,$('#em').value.trim(),$('#pw').value)}catch(e){$('#er').textContent='Correo o contraseña incorrectos.'}};
+ $('#go').onclick=async()=>{try{await authReady;await signInWithEmailAndPassword(auth,$('#em').value.trim(),$('#pw').value)}catch(e){$('#er').textContent='Correo o contraseña incorrectos.'}};
 }
 function shell(){
  $('#app').innerHTML=`<div class="atop"><b>Administrador</b><span><a class="lnk" href="#" style="text-decoration:none;padding:14px 6px">Ver tienda</a>${canAsk()?'<button class="lnk" id="av" style="padding:14px 6px">🔔 Avisos</button>':''}<button class="lnk" id="lo">Salir</button></span></div><div class="tabs">${[['p','Productos'],['c','Clientes'],['o','Pedidos'],['i','Ícono']].map(([k,l])=>`<button data-t="${k}" class="${k==tab?'on':''}">${l}</button>`).join('')}</div><div id="frm"></div><div id="lst"></div>`;
